@@ -162,8 +162,8 @@ V(g)$label.cex <- 1.5 * V(g)$degree / max(V(g)$degree) + .7
 V(g)$label.color <- colores
 V(g)$frame.color <- NA
 egam <- (log(E(g)$weight)+.4) / max(log(E(g)$weight)+.4)
-E(g)$color <- rgb(.8, .8, .8, egam)
+E(g)$color <- rgb(.7, .7, .7, egam)
 E(g)$width <- egam
 # plot the graph in layout1
-plot(g, layout=layout.kamada.kawai, vertex.size=0, edge.arrow.size=.1)
+plot(g, layout=layout.kamada.kawai, vertex.size=0, edge.curved=TRUE, edge.arrow.size=.1)
 ```
