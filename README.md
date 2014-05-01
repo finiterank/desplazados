@@ -1,6 +1,6 @@
 # Desplazamiento forzado en Colombia
 
-Datos de Acción Social (procesados por Juan Tomás Sayago) y del Observatorio de Derechos Humanos de la Presidencia (compartidos por Jhon Riaño).
+Datos de Acción Social (procesados y compartidos por Juan Tomás Sayago) y del Observatorio de Derechos Humanos de la Presidencia (compartidos por Jhon Riaño).
 
 Cálculos varios en R.
 
