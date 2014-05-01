@@ -1,0 +1,169 @@
+Desplazados
+========================================================
+
+```{r}
+library(plyr)
+library(ggplot2)
+library(igraph)
+```
+
+## Datos
+
+```{r}
+llegadas <- read.table("datos//desplazados-llegadas.csv", header=T, sep=";")
+salidas <- read.table("datos//desplazados-salidas.csv", header=T, sep=";")
+flujo <- read.table("datos//matriz-desplazados.csv", header=T, sep=";")
+```
+
+## Mejores nombres para las variables
+
+```{r}
+names(llegadas) <- gsub("X", "ll.", names(llegadas))
+names(llegadas)[1] <- "cod"
+names(llegadas)[2] <- "ll.nd"
+names(salidas) <- gsub("X", "sa.", names(salidas))
+names(salidas)[1] <- "cod"
+names(salidas)[2] <- "sa.nd"
+```
+
+## Nombres municipios
+
+```{r}
+
+load("datos//homicidios.1990.a.2013.Rda")
+mundepcod <- h.df[,c(1,2,3)]
+desplazados <- merge(llegadas, salidas, by="cod", all.x=T, all.y=T, sort=F)
+desplazados <- merge(desplazados, mundepcod, by="cod", all.x=T, all.y=F, sort=F)
+flujo <- merge(flujo, mundepcod, by="cod", all.x=T, all.y=F, sort=F)
+```
+
+## Filling the blanks
+
+```{r}
+desplazados$municipio <- as.character(desplazados$municipio)
+desplazados$departamento <- as.character(desplazados$departamento)
+
+desplazados$municipio[1123:1126] <- c("ND", "Santa Rita", "San José de Ocune", "Belén de Bajirá")
+desplazados$departamento[1123:1126] <- c("ND", "Vichada", "Vichada", "Chocó")
+```
+
+## Only towns with complete data
+
+```{r}
+desplazados <- desplazados[complete.cases(desplazados),]
+```
+
+## by Departamentos
+
+```{r}
+despl.dep <- ddply(desplazados[,c(2:61,63)], .(departamento), numcolwise(sum))
+
+flujo.dep <- ddply(flujo, .(departamento), numcolwise(sum))
+flujo.dep <- flujo.dep[,-2]
+tr.flujo.dep <- setNames(data.frame(t(flujo.dep[,-1])), flujo.dep[,1])
+tr.flujo.dep$cod <- as.numeric(gsub("X", "", row.names(tr.flujo.dep)))
+tr.flujo.dep <- merge(tr.flujo.dep, mundepcod, by="cod", all.x=T, all.y=F, sort=F)
+tr.flujo.dep <- ddply(tr.flujo.dep, .(departamento), numcolwise(sum))
+tr.flujo.dep <- tr.flujo.dep[,-2]
+names(tr.flujo.dep)[5] <- "San Andrés"
+tr.flujo.dep$departamento <- as.character(tr.flujo.dep$departamento)
+tr.flujo.dep$departamento[4] <- "San Andrés"
+```
+
+## Totales
+
+```{r}
+
+tr.flujo.dep$totales <- rowSums(tr.flujo.dep[2:34])
+despl.dep$llegadas <- rowSums(despl.dep[2:31])
+
+despl.dep$salidas <- rowSums(despl.dep[32:61])
+despl.dep$cociente <- despl.dep$salidas / despl.dep$llegadas
+
+for(i in 1984:2012){
+  col.ll <- paste("ll.", as.character(i), sep="")
+  col.sa <- paste("sa.", as.character(i), sep="")
+  col.co <- paste("co.", as.character(i), sep="")
+  despl.dep[col.co] <- despl.dep[col.sa] / despl.dep[col.ll] 
+}
+
+despl.dep["co.nd"] <- despl.dep["sa.nd"] / despl.dep["ll.nd"]
+
+```
+
+## Plot llegadas versus salidas
+
+```{r}
+despl.dep$departamento[4] <- "San Andrés"
+labels = c(expression(1), expression(10), expression(10^2),expression(10^3),expression(10^4),expression(10^5), expression(10^6))
+breaks = c(1, 10, 100,1000,10000,100000, 1000000)
+p <- ggplot(despl.dep[-24,], aes(salidas, llegadas)) 
+p <- p + scale_y_log10(breaks=breaks, labels=labels) 
+p <- p + scale_x_log10(breaks=breaks, labels=labels)
+p <- p + xlab("Desplazados de municipios en el departamento") + ylab("Desplazados a municipios en el departamento") 
+p <- p + geom_text(aes(label=departamento), hjust=0, vjust=0, size=4, angle=-45)
+p <- p + geom_abline(intercept = 0, slope = 1, colour = "red", size = 0.2)
+p
+ggsave(p, file="despl.dep.png", width=15, height=15)
+
+```
+
+## Plot llegadas versus salidas (Municipios)
+
+```{r}
+
+desplazados$llegadas <- rowSums(desplazados[2:31])
+desplazados$salidas <- rowSums(desplazados[32:61])
+p <- ggplot(desplazados[desplazados$departamento != "ND",], aes(salidas, llegadas)) + geom_point(aes(colour=departamento))
+p <- p + scale_y_log10(breaks=breaks, labels=labels) 
+p <- p + scale_x_log10(breaks=breaks, labels=labels)
+p <- p + xlab("Desplazados") + ylab("Recibidos") 
+p <- p + geom_abline(intercept = 0, slope = 1, colour = "red", size = 0.2)
+ggsave(p, file="despl.mun.png", width=15, height=15)
+
+```
+
+## Función plot llegadas versus salidas (Municipios por año)
+
+```{r}
+plotDesplazados <- function(yr){
+  labels <- c(expression(1), expression(10), expression(10^2),expression(10^3),expression(10^4),expression(10^5), expression(10^6))
+  breaks <- c(1, 10, 100,1000,10000,100000, 1000000)
+  ll <- paste("ll.", as.character(yr), sep="")
+  sa <- paste("sa.", as.character(yr), sep="")
+  p <- ggplot(desplazados[desplazados$departamento != "ND",], aes_string(x=sa, y=ll)) + geom_point(aes(colour=departamento))
+  p <- p + scale_y_log10(breaks=breaks, labels=labels) 
+  p <- p + scale_x_log10(breaks=breaks, labels=labels)
+  p <- p + xlab(paste("Desplazados", as.character(yr), sep=" ")) + ylab(paste("Recibidos", as.character(yr), sep=" ")) 
+  p <- p + geom_abline(intercept = 0, slope = 1, colour = "red", size = 0.2)
+  return(p)
+}
+```
+
+## Grafo de desplazamiento dentro de Antioquia
+
+```{r}
+coord <- which(flujo$departamento == "Antioquia")
+flujo.antioquia <- flujo[coord, coord + 1]
+flujo.antioquia.mat <- as.matrix(flujo.antioquia)
+dimnames(flujo.antioquia.mat) <- list(flujo$municipio[coord], flujo$municipio[coord])
+g <- graph.adjacency(flujo.antioquia.mat, weighted=T, mode="directed")
+g <- simplify(g)
+V(g)$label <- V(g)$name
+V(g)$degree <- degree(g)
+
+llegan <- colSums(flujo.antioquia.mat)
+salen <- rowSums(flujo.antioquia.mat)
+colores <- ifelse(llegan >= salen, "dodgerblue3", "orangered2")
+
+set.seed(34)
+
+V(g)$label.cex <- 1.5 * V(g)$degree / max(V(g)$degree) + .7
+V(g)$label.color <- colores
+V(g)$frame.color <- NA
+egam <- (log(E(g)$weight)+.4) / max(log(E(g)$weight)+.4)
+E(g)$color <- rgb(.8, .8, .8, egam)
+E(g)$width <- egam
+# plot the graph in layout1
+plot(g, layout=layout.kamada.kawai, vertex.size=0, edge.arrow.size=.1)
+```
